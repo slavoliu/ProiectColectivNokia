@@ -1,21 +1,16 @@
-import Classes as cls
+import ClassesOK as cls
 
 def GetData():
-    db=cls.DataBase()
-    if db.check_collection_exists():
-        db.print_total_number_of_elements_from_db()
-        db.create_test_set_collections()
-        db.print_cloudification_ratios()
-        db.print_false_last_run_names()
+    datab=cls.DataBase()
+    pro=cls.Processing(datab)
+    check = datab.check_collection_exists()  
+    if not check:
+        datab.add_data_to_database()
+        datab.create_test_set_collections()
+        datab.total_number_of_elements_from_db()
+        pro.show_cloudification_of_each_TestSet()
     else:
-        db.start_DB()
-        db.enter_data_from_csv_in_db()
-        db.total_number_of_elements_from_db()
-        db.print_total_number_of_elements_from_db()
-        db.create_test_set_collections()
-        db.print_cloudification_ratios()
-        db.print_false_last_run_names()
-   
-
-
-
+        datab.run_checker()
+        datab.create_test_set_collections()
+        datab.total_number_of_elements_from_db()
+        pro.show_cloudification_of_each_TestSet()

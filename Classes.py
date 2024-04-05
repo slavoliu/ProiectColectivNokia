@@ -6,44 +6,58 @@ import re
 class DataBase:
     def __init__(self):
         self.csv_path = '/home/slavoliu/report.csv'
-        self.name_of_the_table = 'Cloud'
-        self.name_of_the_data = 'TestSet'
+        self.table_name = 'Cloud'
+        self.collection_name = 'TestSet'
         self.client = MongoClient("mongodb://localhost:27017")
-        self.db = self.client[self.name_of_the_table]
-        self.collection = self.db[self.name_of_the_data]
+        self.db = self.client[self.table_name]
+        self.collection = self.db[self.collection_name]
+        self.data=None
+        self.count=None
         self.list_of_new_collection_name=[]
+
+    def my_decorator(func):
+        def wrapper():
+            print("<-------------------------------------------->")
+            func()
+            print("<-------------------------------------------->")
+        return wrapper
         
-
-    def start_DB(self):
+    @my_decorator
+    def start_mongodb_service(self):
         os.system('sudo systemctl start mongod')
+        print("Start mongod service")
 
-    def stop_DB(self):
+    @my_decorator
+    def stop_mongodb_service(self):
         os.system('sudo systemctl stop mongod')
+        print("Stop mongod service")
 
-    def add_and_filter_csv(self):
+    @my_decorator
+    def add_data_to_database(self):
+        self.start_mongodb_service()
         df = pd.read_csv(self.csv_path, skiprows=[0], usecols=[2, 3, 27])
-        data = df.to_dict(orient="records")
-        return data
-
-    def enter_data_from_csv_in_db(self):
+        self.data = df.to_dict(orient="records")
         data = self.add_and_filter_csv()
         self.collection.insert_many(data)
+        print(f'inserting data in table {self.table_name}, inside the collection {self.collection_name}')
 
+    @my_decorator
     def total_number_of_elements_from_db(self):
-        count = self.collection.count_documents({})
-        return count
-
-    def print_total_number_of_elements_from_db(self):
-        count = self.total_number_of_elements_from_db()
-        print(f'There are {count} documents in this collection')
+        self.count = self.collection.count_documents({})
+        print(f'There are {self.count} documents in this collection')
 
     def check_collection_exists(self):
+        print("Checking if collection exists in database")
         collection_list = self.db.list_collection_names() 
-        return self.name_of_the_data in collection_list
+        if(self.collection_name in collection_list):
+            return True
+        else:
+            return False
 
     def create_test_set_collections(self):
         if len(self.list_of_new_collection_name) != 0:
             return self.list_of_new_collection_name
+            print("Create collections for each Test Set")
         else:
             unique_test_sets = self.collection.distinct("Test Set")
 
@@ -58,6 +72,7 @@ class DataBase:
                 for doc in matching_documents:
                     new_doc = {"name": doc["Name"], "last_run": doc["Last Run on UTE Cloud"]}
                     new_collection.insert_one(new_doc)
+        print("Create collections for each Test Set")
         return self.list_of_new_collection_name
 
     
@@ -125,7 +140,7 @@ class DataBase:
 
         for j in range(len(cloudification_ratio_strings)):
             print(f'{cloudification_ratio_strings[j]}\n')
-
+#-------------------------------------------------------------------------------------------------------------------------
     def get_false_last_run_names(self):
         false_last_run_names = {}
 

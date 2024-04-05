@@ -93,6 +93,7 @@ class Processing(DataBase):
         self.count_TrueLastRun = []
         self.cloudification_of_each_TestSet = []
         self.show_cloudification = []
+        self.root_folder="/home/slavoliu/test_line_specific"
 
     def count_TestSet(self):
         for TestSets in self.datab.list_of_TestSet_collection_name:
@@ -175,3 +176,92 @@ class Processing(DataBase):
             client.close()
 
         
+    def cloudification_false(self):
+        if self.datab.run:
+            print("Test Cases from clodification false was executed")
+        else:
+            client = MongoClient('localhost', 27017)
+            db = client[self.datab.table_name]
+            cloudification_false=db['cloudification_false']
+            TestSet_collection=db[self.datab.collection_name]
+            documents=TestSet_collection.find({"Last Run on UTE Cloud":False})
+
+            for doc in documents:
+                cloudification_false.insert_one({
+                'Test Set': doc['Test Set'],
+                'Name': doc['Name']
+            })
+            
+            client.close()
+
+
+
+
+    def add_path_to_cloudification_false(self):
+        client = MongoClient('localhost', 27017)
+        db = client[self.datab.table_name]
+        cloudification_false = db['cloudification_false']
+
+        documents = cloudification_false.find()
+
+        pattern = re.compile('.*(\d{3}).*')
+
+        for doc in documents:
+            test_set = doc['Test Set']
+            match = pattern.match(test_set)
+
+            path_of_test_set = 'Nothing' 
+
+            if match:
+                test_set_last_three_digits = match.group(1)
+
+                for dirpath, dirnames, filenames in os.walk(self.root_folder):
+                    for dirname in dirnames:
+                        dirname_match = pattern.match(dirname)
+
+                        if dirname_match and dirname_match.group(1) == test_set_last_three_digits:
+                            path_of_test_set = os.path.join(dirpath, dirname)
+
+            cloudification_false.update_one({'_id': doc['_id']}, {'$set': {'Path of Test Set': path_of_test_set}}, upsert=True)
+
+        client.close()
+
+
+
+
+    def find_test_name_in_files(self):
+        if self.datab.run:
+            print("We found the test names in files")
+        else:
+            client = MongoClient('localhost', 27017)
+            db = client[self.datab.table_name]
+            cloudification_false = db['cloudification_false']
+            found = db['found']
+            not_found = db['not_found']
+
+            documents = cloudification_false.find()
+
+            for doc in documents:
+                name = doc['Name']
+                path_of_test_set = doc['Path of Test Set']
+
+                if os.path.exists(path_of_test_set):
+                    for dirpath, dirnames, filenames in os.walk(path_of_test_set):
+                        for filename in filenames:
+                            if filename.endswith('.robot'):
+                                file_path = os.path.join(dirpath, filename)
+
+                                with open(file_path, 'r') as file:
+                                    content = file.read()
+
+                                    if name in content:
+                                        found.insert_one({'File Name': filename,'Name': name})
+                                    else:
+                                        not_found.insert_one({'File Name': filename, 'Name': name})
+
+            client.close()
+
+
+
+
+

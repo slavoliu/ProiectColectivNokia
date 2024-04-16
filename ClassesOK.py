@@ -244,6 +244,7 @@ class Processing(DataBase):
             for doc in documents:
                 name = doc['Name']
                 path_of_test_set = doc['Path of Test Set']
+                testset=doc['Test Set']
 
                 if os.path.exists(path_of_test_set):
                     for dirpath, dirnames, filenames in os.walk(path_of_test_set):
@@ -255,9 +256,9 @@ class Processing(DataBase):
                                     content = file.read()
 
                                     if name in content:
-                                        found.insert_one({'File Name': filename,'Name': name})
+                                        found.insert_one({'File Name': filename,'Name': name,'Test Set':testset})
                                     else:
-                                        not_found.insert_one({'File Name': filename, 'Name': name})
+                                        not_found.insert_one({'File Name': filename, 'Name': name,'Test Set':testset})
 
             client.close()
 

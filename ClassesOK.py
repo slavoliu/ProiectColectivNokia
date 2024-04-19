@@ -231,7 +231,7 @@ class Processing(DataBase):
 
     def find_test_name_in_files(self):
         if self.datab.run:
-            print("We found the test names in files")
+            print("We already found the test names in files")
         else:
             client = MongoClient('localhost', 27017)
             db = client[self.datab.table_name]
@@ -239,13 +239,27 @@ class Processing(DataBase):
             found = db['found']
             not_found = db['not_found']
 
+            # Create unique indexes
+            found.create_index([("File Name", 1), ("Name", 1), ("Test Set", 1), ("Path of Test Set", 1)], unique=True)
+            not_found.create_index([("File Name", 1), ("Name", 1), ("Test Set", 1), ("Path of Test Set", 1)], unique=True)
+
             documents = cloudification_false.find()
 
             for doc in documents:
                 name = doc['Name']
+            
+                cleared_names= re.sub(r"\[\d+\.\d+\]\[\d+\]|\[\d+\]|\[\d+\.\d+\]|\[\d+\.\d+\] \[\d+\.\d+\]",'',name)
+                cleared_names=cleared_names.strip()
+                cloudification_false.update_one({'_id': doc['_id']}, {'$set': {'Name' : cleared_names}},upsert=True)
+            
+                # Retrieve the updated document
+                updated_doc = cloudification_false.find_one({'_id': doc['_id']})
+                updated_name = updated_doc['Name']  # Now this should contain the updated name
+            
                 path_of_test_set = doc['Path of Test Set']
                 testset=doc['Test Set']
 
+                # Scan files
                 if os.path.exists(path_of_test_set):
                     for dirpath, dirnames, filenames in os.walk(path_of_test_set):
                         for filename in filenames:
@@ -254,15 +268,8 @@ class Processing(DataBase):
 
                                 with open(file_path, 'r') as file:
                                     content = file.read()
-
-                                    if name in content:
-                                        found.insert_one({'File Name': filename,'Name': name,'Test Set':testset})
+                                
+                                    if updated_name in content:
+                                        found.update_one({'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set}, {'$setOnInsert': {'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set}}, upsert=True)
                                     else:
-                                        not_found.insert_one({'File Name': filename, 'Name': name,'Test Set':testset})
-
-            client.close()
-
-
-
-
-
+                                        not_found.update_one({'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set}, {'$setOnInsert': {'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set}}, upsert=True)

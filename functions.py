@@ -13,6 +13,7 @@ def GetData():
         pro.add_path_to_cloudification_false()
         pro.find_test_name_in_files()
         pro.QC_tags_in_files()
+        pro.QC_files_exists()
     else:
         datab.run_checker()
         datab.create_test_set_collections()
@@ -22,3 +23,4 @@ def GetData():
         pro.add_path_to_cloudification_false()
         pro.find_test_name_in_files()
         pro.QC_tags_in_files()
+        pro.QC_files_exists()

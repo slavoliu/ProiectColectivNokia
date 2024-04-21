@@ -312,6 +312,31 @@ class Processing(DataBase):
                             else:
                                 found.update_one({'_id':name_found['_id']},{'$set':{'QC id from file':'False'}})
 
+    def QC_files_exists(self):
+        if self.datab.run:
+            print("We searched the QC tags in files")
+        else:
+            client = MongoClient('localhost', 27017)
+            db = client[self.datab.table_name]
+            found=db['found']
+
+            condition={'QC id from file':"True"}
+
+            documents=found.find(condition)
+
+            for doc in documents:
+                print(doc['Name'])
+                path_of_test_set=doc['Path of Test Set']
+                file_name=doc['File Name']
+                file_name_without_extension=os.path.splitext(file_name)[0]
+                ext='.qc'
+                full_path=os.path.join(path_of_test_set,file_name_without_extension + ext)
+                print(full_path)
+
+                if os.path.isfile(full_path):
+                    found.update_one({'_id':doc['_id']},{'$set':{'QC file':"True"}})
+                else:
+                    found.update_one({'_id':doc['_id']},{'$set':{'QC file':"False"}})
 
 
             

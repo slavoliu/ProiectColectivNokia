@@ -30,11 +30,13 @@ class DataBase:
 
     def add_data_to_database(self):
         self.start_mongodb_service()
-        df = pd.read_csv(self.csv_path, skiprows=[0], usecols=[2, 3, 27])
+        df = pd.read_csv(self.csv_path, skiprows=[0], usecols=[0, 1, 2, 3, 27])
         data = df.to_dict(orient="records")
 
         for document in data:
             query = {
+                "QC_ID_CSV": document["QC ID"],
+                "Test_Lab_Path":document["Test Lab Path"],
                 "Test Set": document["Test Set"],
                 "Name": document["Name"],
                 "Last Run on UTE Cloud": document["Last Run on UTE Cloud"]
@@ -188,6 +190,8 @@ class Processing(DataBase):
 
             for doc in documents:
                 cloudification_false.insert_one({
+                'QC_ID_CSV': doc['QC ID'],
+                "Test_Lab_Path": doc["Test Lab Path"],
                 'Test Set': doc['Test Set'],
                 'Name': doc['Name']
             })
@@ -239,9 +243,8 @@ class Processing(DataBase):
             found = db['found']
             not_found = db['not_found']
 
-            # Create unique indexes
-            found.create_index([("File Name", 1), ("Name", 1), ("Test Set", 1), ("Path of Test Set", 1)], unique=True)
-            not_found.create_index([("File Name", 1), ("Name", 1), ("Test Set", 1), ("Path of Test Set", 1)], unique=True)
+            # found.create_index([("File Name", 1), ("Name", 1), ("Test Set", 1), ("Path of Test Set", 1)], unique=True)
+            # not_found.create_index([("File Name", 1), ("Name", 1), ("Test Set", 1), ("Path of Test Set", 1)], unique=True)
 
             documents = cloudification_false.find()
 
@@ -252,14 +255,14 @@ class Processing(DataBase):
                 cleared_names=cleared_names.strip()
                 cloudification_false.update_one({'_id': doc['_id']}, {'$set': {'Name' : cleared_names}},upsert=True)
             
-                # Retrieve the updated document
                 updated_doc = cloudification_false.find_one({'_id': doc['_id']})
-                updated_name = updated_doc['Name']  # Now this should contain the updated name
+                updated_name = updated_doc['Name']  
             
                 path_of_test_set = doc['Path of Test Set']
                 testset=doc['Test Set']
+                qc_id=doc['QC_ID_CSV']
+                lab_path=doc['Test_Lab_Path']
 
-                # Scan files
                 if os.path.exists(path_of_test_set):
                     for dirpath, dirnames, filenames in os.walk(path_of_test_set):
                         for filename in filenames:
@@ -270,6 +273,58 @@ class Processing(DataBase):
                                     content = file.read()
                                 
                                     if updated_name in content:
-                                        found.update_one({'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set}, {'$setOnInsert': {'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set}}, upsert=True)
+                                        found.update_one({'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set, 'QC_ID_CSV': qc_id, 'Test Lab Path' : lab_path}, {'$setOnInsert': {'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set, 'QC_ID_CSV': qc_id, 'Test Lab Path' : lab_path}}, upsert=True)
                                     else:
-                                        not_found.update_one({'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set}, {'$setOnInsert': {'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set}}, upsert=True)
+                                        not_found.update_one({'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set, 'QC_ID_CSV': qc_id, 'Test Lab Path' : lab_path}, {'$setOnInsert': {'File Name': filename, 'Name': updated_name, 'Test Set': testset, 'Path of Test Set': path_of_test_set,'QC_ID_CSV': qc_id,'Test Lab Path' : lab_path }}, upsert=True)
+
+
+    def QC_tags_in_files(self):
+        if self.datab.run:
+            print("We searched the QC tags in files")
+        else:
+            client = MongoClient('localhost', 27017)
+            db = client[self.datab.table_name]
+            cloudification_false=db['cloudification_false']
+            found=db['found']
+
+            documents=cloudification_false.find()
+            
+            for doc in documents:
+                TC_name_cloudification=cloudification_false.find({'Name':doc['Name']})
+                for name_cloudification in TC_name_cloudification:
+                    TC_name_found=found.find({'Name':doc['Name']})
+                    for name_found in TC_name_found:
+                        if name_cloudification['Name']==name_found['Name']:
+                            print(name_cloudification['Name'])
+                            print(name_found['Name'])
+                            path_of_test=name_found['Path of Test Set']
+                            file_name=name_found['File Name']
+                            qc_id_csv=name_found['QC_ID_CSV']
+                            file_path=os.path.join(path_of_test,file_name)
+                            print(file_path)
+
+                            with open(file_path,'r') as file:
+                                lines=file.read()
+
+                            
+                            if str(qc_id_csv) in lines:
+                                found.update_one({'_id':name_found['_id']},{'$set':{'QC id from file':'True'}})
+                            else:
+                                found.update_one({'_id':name_found['_id']},{'$set':{'QC id from file':'False'}})
+
+
+
+            
+
+
+
+
+
+
+
+
+            
+
+
+
+

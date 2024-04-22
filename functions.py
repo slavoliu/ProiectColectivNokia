@@ -14,6 +14,10 @@ def GetData():
         pro.find_test_name_in_files()
         pro.QC_tags_in_files()
         pro.QC_files_exists()
+        pro.test_lab_path_qc_file()
+        pro.test_set_qc_file()
+        pro.TC_name_qc_file()
+        pro.is_TC_tracked_by_QC()
     else:
         datab.run_checker()
         datab.create_test_set_collections()
@@ -24,3 +28,7 @@ def GetData():
         pro.find_test_name_in_files()
         pro.QC_tags_in_files()
         pro.QC_files_exists()
+        pro.test_lab_path_qc_file()
+        pro.test_set_qc_file()
+        pro.TC_name_qc_file()
+        pro.is_TC_tracked_by_QC()

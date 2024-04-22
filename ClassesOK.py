@@ -2,6 +2,7 @@ from pymongo import MongoClient, errors, cursor
 import pandas as pd
 import os
 import re
+import json
 
 
 class DataBase:
@@ -314,15 +315,15 @@ class Processing(DataBase):
 
     def QC_files_exists(self):
         if self.datab.run:
-            print("We searched the QC tags in files")
+            print("We searched the QC file in files")
         else:
             client = MongoClient('localhost', 27017)
             db = client[self.datab.table_name]
             found=db['found']
 
-            condition={'QC id from file':"True"}
+            # condition={'QC id from file':"True"}
 
-            documents=found.find(condition)
+            documents=found.find()
 
             for doc in documents:
                 print(doc['Name'])
@@ -335,10 +336,141 @@ class Processing(DataBase):
 
                 if os.path.isfile(full_path):
                     found.update_one({'_id':doc['_id']},{'$set':{'QC file':"True"}})
+                    found.update_one({'_id':doc['_id']},{'$set':{'QC file path':full_path}})
                 else:
                     found.update_one({'_id':doc['_id']},{'$set':{'QC file':"False"}})
 
 
+    def test_lab_path_qc_file(self):
+        if self.datab.run:
+            print("Test lab path from qc file was verified")
+        else:
+            client = MongoClient('localhost', 27017)
+            db = client[self.datab.table_name]
+            found=db['found']
+
+            condition={'QC file':"True"}
+
+            documents=found.find(condition)
+
+            for doc in documents:
+                qc_file_path=doc['QC file path']
+                test_lab_path=doc['Test Lab Path']
+                test_lab_path = test_lab_path.replace("\\", "\\\\")
+                found.update_one({'_id':doc['_id']},{'$set':{'Test Lab Path':test_lab_path}})
+                test_lab_path=doc['Test Lab Path']
+                with open(qc_file_path,'r') as f:
+                    data=json.load(f)
+                pattern=re.compile('SBTS00.*')
+
+                for key in data.keys():
+                    if pattern.match(key):
+                        if test_lab_path in data[key]:
+                            found.update_one({'_id':doc['_id']},{'$set':{'QC file - lab path':"True"}})
+                        else:
+                            found.update_one({'_id':doc['_id']},{'$set':{'QC file - lab path':"False"}})
+                
+
+                
+
+    def test_set_qc_file(self):
+        if self.datab.run:
+            print("Test test set from qc file was verified")
+        else:
+            client = MongoClient('localhost', 27017)
+            db = client[self.datab.table_name]
+            found=db['found']
+
+            condition={'QC file':"True"}
+
+            documents=found.find(condition)
+
+            for doc in documents:
+                qc_file_path=doc['QC file path']
+                test_set=doc['Test Set']
+                with open(qc_file_path,'r') as f:
+                    content= f.read()
+
+                data=json.dumps(content)
+
+                if test_set in data:
+                    found.update_one({'_id':doc['_id']},{'$set':{'QC file - Test Set':"True"}})
+                else:
+                    found.update_one({'_id':doc['_id']},{'$set':{'QC file - Test Set':"False"}})
+
+    def TC_name_qc_file(self):
+        if self.datab.run:
+            print("Test name from qc file was verified")
+        else:
+            client = MongoClient('localhost', 27017)
+            db = client[self.datab.table_name]
+            found=db['found']
+
+            condition={'QC file':"True"}
+
+            documents=found.find(condition)
+
+            for doc in documents:
+                qc_file_path=doc['QC file path']
+                test_name=doc['Name']
+                with open(qc_file_path,'r') as f:
+                    content= f.read()
+
+                data=json.dumps(content)
+               
+                if test_name in data:
+                    found.update_one({'_id':doc['_id']},{'$set':{'QC file - TC Name':"True"}})
+                else:
+                    found.update_one({'_id':doc['_id']},{'$set':{'QC file - TC Name':"False"}})
+
+    def is_TC_tracked_by_QC(self):
+        if self.datab.run:
+            print("The QC tracking for TC's was verified")
+        else:
+            client = MongoClient('localhost', 27017)
+            db = client[self.datab.table_name]
+            found = db['found']
+            NotOkQC = db['NotOkQC']
+            OkQC = db['OkQC']
+
+            documents = found.find()
+
+            for doc in documents:
+                name = doc['Name']
+                qc_id = doc['QC_ID_CSV']
+                testset = doc['Test Set']
+                path = doc['Path of Test Set']
+
+                isQCID = doc['QC id from file']
+                isQCFile = doc['QC file']
+
+                data = {'Name': name, 'QC ID': qc_id, 'Test Set': testset, 'Path of Test Set': path, 'QC id from file': isQCID, 'QC file': isQCFile}
+
+                if (str(isQCID) == 'False' or str(isQCFile) == 'False') and str(isQCFile) == 'False':
+                    NotOkQC.insert_one(data)
+                else:
+                    isQCpath = doc['QC file - lab path']
+                    isQCtestset = doc['QC file - Test Set']
+                    isQCTCname = doc['QC file - TC Name']
+
+                    data.update({'QC file - lab path': isQCpath if str(isQCpath) == 'False' else "True",
+                                'QC file - Test Set': isQCtestset if str(isQCtestset) == 'False' else "True",
+                                'QC file - TC Name': isQCTCname if str(isQCTCname) == 'False' else "True"})
+                    
+                    found.update_one({'_id': doc['_id']}, {'$set': data})
+
+                    if 'False' in data.values():
+                        NotOkQC.insert_one(data)
+                    else:
+                        OkQC.insert_one(data)
+
+
+                    
+
+
+
+
+
             
 
 
@@ -349,7 +481,6 @@ class Processing(DataBase):
 
 
             
-
 
 
 
